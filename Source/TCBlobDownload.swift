@@ -23,6 +23,9 @@ public class TCBlobDownload {
 
     /// An optional completion closure executed when a download was completed by the download task.
     public var completion: completionHandler
+    
+    /// An optional file name to display as the download name that is more user friendly than the actual file name
+    private let userFriendlyName: String?
 
     /// An optional file name set by the user.
     private let preferedFileName: String?
@@ -41,36 +44,48 @@ public class TCBlobDownload {
 
     /// A computed property to get the filename of the downloaded file.
     public var fileName: String? {
-        return self.preferedFileName ?? self.downloadTask.response?.suggestedFilename
+        
+            return self.preferedFileName ?? self.downloadTask.response?.suggestedFilename
+    }
+    
+    public var friendlyName : String? {
+        
+        if((userFriendlyName) != nil){
+            return userFriendlyName
+        }else{
+            return self.preferedFileName ?? self.downloadTask.response?.suggestedFilename
+        }
+        
     }
 
     /// A computed destination URL depending on the `destinationPath`, `fileName`, and `suggestedFileName` from the underlying `NSURLResponse`.
     public var destinationURL: NSURL {
         let destinationPath = self.directory ?? NSURL(fileURLWithPath: NSTemporaryDirectory())
 
-        return NSURL(string: self.fileName!, relativeToURL: destinationPath!)!.URLByStandardizingPath!
+        return NSURL(string: self.fileName!, relativeToURL: destinationPath)!.URLByStandardizingPath!
     }
 
     /**
         Initialize a new download assuming the `NSURLSessionDownloadTask` was already created.
     
-        :param: downloadTask The underlying download task for this download.
-        :param: directory The directory where to move the downloaded file once completed.
-        :param: fileName The preferred file name once the download is completed.
-        :param: delegate An optional delegate for this download.
+        - parameter downloadTask: The underlying download task for this download.
+        - parameter directory: The directory where to move the downloaded file once completed.
+        - parameter fileName: The preferred file name once the download is completed.
+        - parameter delegate: An optional delegate for this download.
     */
-    init(downloadTask: NSURLSessionDownloadTask, toDirectory directory: NSURL?, fileName: String?, delegate: TCBlobDownloadDelegate?) {
+    init(downloadTask: NSURLSessionDownloadTask, toDirectory directory: NSURL?, fileName: String?, friendlyName: String?, delegate: TCBlobDownloadDelegate?) {
         self.downloadTask = downloadTask
         self.directory = directory
         self.preferedFileName = fileName
         self.delegate = delegate
+        self.userFriendlyName = friendlyName
     }
 
     /**
         
     */
-    convenience init(downloadTask: NSURLSessionDownloadTask, toDirectory directory: NSURL?, fileName: String?, progression: progressionHandler?, completion: completionHandler?) {
-        self.init(downloadTask: downloadTask, toDirectory: directory, fileName: fileName, delegate: nil)
+    convenience init(downloadTask: NSURLSessionDownloadTask, toDirectory directory: NSURL?, fileName: String?, friendlyName:String?, progression: progressionHandler?, completion: completionHandler?) {
+        self.init(downloadTask: downloadTask, toDirectory: directory, fileName: fileName, friendlyName: friendlyName, delegate: nil)
         self.progression = progression
         self.completion = completion
     }
@@ -109,9 +124,9 @@ public class TCBlobDownload {
         :see: `TCBlobDownloadManager -downloadFileWithResumeData`
         :see: `NSURLSessionDownloadTask -cancelByProducingResumeData`
 
-        :param: completionHandler A completion handler that is called when the download has been successfully canceled. If the download is resumable, the completion handler is provided with a resumeData object.
+        - parameter completionHandler: A completion handler that is called when the download has been successfully canceled. If the download is resumable, the completion handler is provided with a resumeData object.
     */
-    public func cancelWithResumeData(completionHandler: (NSData!) -> Void) {
+    public func cancelWithResumeData(completionHandler: (NSData?) -> Void) {
         self.downloadTask.cancelByProducingResumeData(completionHandler)
     }
 
@@ -125,10 +140,10 @@ public protocol TCBlobDownloadDelegate: class {
     
         :see: `NSURLSession -URLSession:dataTask:didReceiveData:`
     
-        :param: download The download that received a chunk of data.
-        :param: progress The current progress of the download, between 0 and 1. 0 means nothing was received and 1 means the download is completed.
-        :param: totalBytesWritten The total number of bytes the download has currently written to the disk.
-        :param: totalBytesExpectedToWrite The total number of bytes the download will write to the disk once completed.
+        - parameter download: The download that received a chunk of data.
+        - parameter progress: The current progress of the download, between 0 and 1. 0 means nothing was received and 1 means the download is completed.
+        - parameter totalBytesWritten: The total number of bytes the download has currently written to the disk.
+        - parameter totalBytesExpectedToWrite: The total number of bytes the download will write to the disk once completed.
     */
     func download(download: TCBlobDownload, didProgress progress: Float, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64)
 
@@ -137,16 +152,16 @@ public protocol TCBlobDownloadDelegate: class {
     
         :see: `NSURLSession -URLSession:task:didCompleteWithError:`
     
-        :param: download The download that received a chunk of data.
-        :param: error An eventual error. If `nil`, consider the download as being successful.
-        :param: location The location where the downloaded file can be found.
+        - parameter download: The download that received a chunk of data.
+        - parameter error: An eventual error. If `nil`, consider the download as being successful.
+        - parameter location: The location where the downloaded file can be found.
     */
     func download(download: TCBlobDownload, didFinishWithError error: NSError?, atLocation location: NSURL?)
 }
 
 // MARK: Printable
 
-extension TCBlobDownload: Printable {
+extension TCBlobDownload: CustomStringConvertible {
     public var description: String {
         var parts: [String] = []
         var state: String
@@ -159,11 +174,11 @@ extension TCBlobDownload: Printable {
         }
         
         parts.append("TCBlobDownload")
-        parts.append("URL: \(self.downloadTask.originalRequest.URL)")
+        parts.append("URL: \(self.downloadTask.originalRequest!.URL)")
         parts.append("Download task state: \(state)")
         parts.append("destinationPath: \(self.directory)")
         parts.append("fileName: \(self.fileName)")
         
-        return join(" | ", parts)
+        return parts.joinWithSeparator(" | ")
     }
 }
